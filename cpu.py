@@ -291,17 +291,7 @@ class CPU:
         # execution continues in the interrupt handler until IRET
         self.interrupted = True
         while self.interrupted:
-            IR = self.ram_read(self.pc)
-            advance = (IR >> 6) + 1
-            operand_a = self.ram_read(self.pc + 1)
-            operand_b = self.ram_read(self.pc + 2)
-
-            self.branchtable[IR](operand_a, operand_b)
-
-            if IR == 19:
-                break
-            if not ((IR & 0b00010000) >> 4):
-                self.pc += advance
+            self.loop()
 
     def run(self):
         """Run the CPU."""
@@ -313,19 +303,22 @@ class CPU:
             if self.reg[self.IS_reg]:
                 self.handle_int()
 
-            IR = self.ram_read(self.pc)
+            self.loop()
 
-            # first two bits are the number of args
-            # pc will advance by that much plus one
-            advance = (IR >> 6) + 1
+    def loop(self):
+        IR = self.ram_read(self.pc)
 
-            # still a lil concerned about assigning a command as an operand
-            operand_a = self.ram_read(self.pc + 1)
-            operand_b = self.ram_read(self.pc + 2)
+        # first two bits are the number of args
+        # pc will advance by that much plus one
+        advance = (IR >> 6) + 1
 
-            self.branchtable[IR](operand_a, operand_b)
+        # still a lil concerned about assigning a command as an operand
+        operand_a = self.ram_read(self.pc + 1)
+        operand_b = self.ram_read(self.pc + 2)
 
-            # fourth bit is whether the command sets the PC
-            # mask with & to isolate the bit and shift
-            if not ((IR & 0b00010000) >> 4):
-                self.pc += advance
+        self.branchtable[IR](operand_a, operand_b)
+
+        # fourth bit is whether the command sets the PC
+        # mask with & to isolate the bit and shift
+        if not ((IR & 0b00010000) >> 4):
+            self.pc += advance
