@@ -50,6 +50,8 @@ class CPU:
         self.branchtable[163] = lambda a, b: self.alu('DIV', a, b)
         self.branchtable[164] = lambda a, b: self.alu('MOD', a, b)
 
+        self.branchtable[165] = lambda a, b: self.alu('ADDI', a, b)
+
         self.branchtable[105] = lambda a, b: self.alu('NOT', a, b)
         self.branchtable[168] = lambda a, b: self.alu('AND', a, b)
         self.branchtable[170] = lambda a, b: self.alu('OR', a, b)
@@ -78,11 +80,12 @@ class CPU:
                         self.ram_write(address, int(words[0], 2))
                         address += 1
 
-
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         operations = {
+            "ADDI": lambda: self.reg[reg_a] + reg_b,  # actually immediate
+
             "ADD": lambda: self.reg[reg_a] + self.reg[reg_b],
             "SUB": lambda: self.reg[reg_a] - self.reg[reg_b],
             "MUL": lambda: self.reg[reg_a] * self.reg[reg_b],
