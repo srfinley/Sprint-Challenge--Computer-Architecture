@@ -1,7 +1,7 @@
 """CPU functionality."""
 
 import sys
-# import datetime
+import datetime
 
 class CPU:
     """Main CPU class."""
@@ -22,10 +22,16 @@ class CPU:
 
         # R6 is for interrupt status
         self.IS_reg = 6
+        self.interrupted = False
+
+        # time tracker
+        self.time = None
 
         self.branchtable = {}
         self.branchtable[1] = self.HLT
         self.branchtable[130] = self.LDI
+
+        self.branchtable[19] = self.IRET
 
         self.branchtable[132] = self.ST
 
@@ -240,14 +246,72 @@ class CPU:
         """Value from reg_b stored in RAM at address from reg_a"""
         self.ram_write(self.reg[reg_a], self.reg[reg_b])
 
+    def IRET(self, *args):
+        # Registers R6-R0 are popped off the stack in that order
+        for i in range(6, -1, -1):
+            self.POP(i, "filler")
+
+        # The `FL` register is popped off the stack.
+        self.FL = self.stack_read()
+
+        # The return address is popped off the stack and stored in `PC`
+        self.pc = self.stack_read()
+
+        # Interrupts are re-enabled
+        self.interrupted = False
+
     def timecheck(self):
-        pass
+        if self.time == None:
+            self.time = datetime.datetime.now()
+        diff = datetime.datetime.now() - self.time
+        if diff.seconds >= 1:
+            # fire the interrupt:
+            # set bit 0 of the IS register (R6)
+            # assuming for now this means rightmost bit
+            self.reg[self.IS_reg] = 1
+
+            # reset the timer
+            self.time = datetime.datetime.now()
+
+    def handle_int(self):
+        # clear the bit in the IS register
+        self.reg[self.IS_reg] = 0
+
+        # push PC onto stack
+        self.stack_write(self.pc)
+        # push FL onto stack
+        self.stack_write(self.FL)
+        # push the registers 0-6 on the stack
+        for i in range(7):
+            self.PUSH(i, "filler")
+
+        # set pc to interrupt handler address stored at address 0xF8
+        self.pc = self.ram_read(0xF8)
+
+        # execution continues in the interrupt handler until IRET
+        self.interrupted = True
+        while self.interrupted:
+            IR = self.ram_read(self.pc)
+            advance = (IR >> 6) + 1
+            operand_a = self.ram_read(self.pc + 1)
+            operand_b = self.ram_read(self.pc + 2)
+
+            self.branchtable[IR](operand_a, operand_b)
+
+            if IR == 19:
+                break
+            if not ((IR & 0b00010000) >> 4):
+                self.pc += advance
 
     def run(self):
         """Run the CPU."""
         while True:
-            # interrupt handling
+            # interrupt setting
             self.timecheck()
+
+            # check if bit 0 of the IS register is set
+            if self.reg[self.IS_reg]:
+                self.handle_int()
 
             IR = self.ram_read(self.pc)
 
