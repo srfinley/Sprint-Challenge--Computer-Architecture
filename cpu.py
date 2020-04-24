@@ -39,6 +39,8 @@ class CPU:
         self.branchtable[17] = self.RET
 
         self.branchtable[84] = self.JMP
+        self.branchtable[85] = self.JEQ
+        self.branchtable[86] = self.JNE
 
         self.branchtable[101] = lambda a, b: self.alu('INC', a, b)
         self.branchtable[102] = lambda a, b: self.alu('DEC', a, b)
@@ -108,9 +110,13 @@ class CPU:
         except KeyError:
             raise Exception(f"Unsupported ALU operation: {op}")
 
+    def JMP(self, address, _):
+        """Move PC to RAM location stored at reg address"""
+        self.pc = self.reg[address]
+
     def CMP(self, reg_a, reg_b):
         """Compares value in reg_a to value in reg_b and sets flag"""
-        # 00000LGE
+        # FL = 00000LGE
         if self.reg[reg_a] == self.reg[reg_b]:
             self.FL = 1
         elif self.reg[reg_a] > self.reg[reg_b]:
@@ -119,6 +125,22 @@ class CPU:
             self.FL = 4
 
         return self.reg[reg_a]
+
+    def JEQ(self, address, _):
+        """Jumps PC to the location stored in the register address if equal"""
+        if self.FL == 1:
+            self.JMP(address, _)
+        # if the JMP doesn't happen it must set the PC to the next op
+        else:
+            self.pc += 2
+
+    def JNE(self, address, _):
+        """Jumps PC to the location stored in the register address if not equal"""
+        if self.FL != 1:
+            self.JMP(address, _)
+        # if the JMP doesn't happen it must set the PC to the next op
+        else:
+            self.pc += 2
 
     def trace(self):
         """
@@ -197,10 +219,6 @@ class CPU:
         
         # copy the value at the top of the stack to address
         self.LDI(address, self.stack_read())
-
-    def JMP(self, address, _):
-        """Move PC to RAM location stored at reg address"""
-        self.pc = self.reg[address]
 
     def CALL(self, address, _):
         """Stores current PC address on stack and jumps to address"""
